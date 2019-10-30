@@ -22,6 +22,8 @@ UNIVERSE {
             Dim condition(0, 0) As Integer = (0);
             Dim speed(0, 0) As Double = (0.0);
             Dim distance(0, 0) As Double = (0.0);
+            Dim is_last(0, 0) As Boolean = (0);
+            Dim start_step(0, 0) As Integer = (0);
         }
         AgtType moving_person(0, 0)[0] {
             Dim ID(0, 0) As Integer = (0);
@@ -32,11 +34,15 @@ UNIVERSE {
             Dim condition(0, 0) As Integer = (0);
             Dim speed(0, 0) As Integer = (0);
             Dim distance(0, 0) As Integer = (0);
+            Dim is_last(0, 0) As Boolean = (0);
+            Dim start_step(0, 0) As Integer = (0);
         }
     }
-    Dim appear_rate(0, 0) As Double = ();
-    Dim esc_speed(0, 0) As Double = ();
-    Dim n_waiting(0, 0) As Integer = ();
+    Dim appear_rate(0, 0) As Double = (0.0);
+    Dim esc_speed(0, 0) As Double = (0.0);
+    Dim n_waiting(0, 0) As Integer = (0);
+    Dim sum_time_for_static(0, 0) As Integer = (0);
+    Dim sum_time_for_moving(0, 0) As Integer = (0);
 }
 
 
@@ -53,13 +59,14 @@ Initial_Value {
 //-------------------------------------------------------
 #begin_rule UNIVERSE
 Univ_Init{
-
+	Universe.sum_time_for_static = 0
+	Universe.sum_time_for_moving = 0
 }
 
+//function func(arg) as Integer {
+//}
+
 Univ_Step_Begin{
-	
-	
-	Dim j As Integer // iterator
 	Dim waiting_limit As integer
 	Dim hurry_degree As Double
 	waiting_limit = 7
@@ -70,20 +77,28 @@ Univ_Step_Begin{
 	Dim moving_person As Agt
 	Dim n_moving_person As Integer
 	
-	if GetCountStep() <= 80 Then
+	if GetCountStep() <= 80 and GetCountStep() Mod 2 == 0 Then
 		If Universe.n_waiting < waiting_limit and hurry_degree > Universe.appear_rate Then
 			Println(Universe.n_waiting)
 			person = CreateAgt(Universe.escalator.person)
 			person.speed = 2
+			person.is_last= true
+			person.start_step = GetCountStep()
 		Else
 			moving_person = CreateAgt(Universe.escalator.moving_person)
 			moving_person.speed = 2
+			moving_person.is_last = true
+			moving_person.start_step = GetCountStep()
 		End if
 	End if 
+//	Universe.escalator.person(n_person-1).is_last = false
+//	Universe.escalator.moving_person(n_moving_person-1).is_last = false
+
 	
-	
+	Dim j As Integer // iterator
 	Universe.n_waiting = 0
 	n_person = CountAgt(Universe.escalator.person)
+	// Measure distance with front person
 	For j = 0 To n_person-2
 		if Universe.escalator.person(j).X < 30 Then
 			Universe.n_waiting = Universe.n_waiting + 1
@@ -98,7 +113,9 @@ Univ_Step_Begin{
 }
 
 Univ_Step_End{
-
+	If GetCountStep() >= 200 Then
+		ExitSimulationMsgLn("static:" & Universe.sum_time_for_static & "moving:" & Universe.sum_time_for_moving)
+	End if
 }
 
 Univ_Finish{
@@ -126,6 +143,15 @@ If My.ID != 0 Then
 	front = Universe.escalator.person(My.ID - 1)
 End if
 
+
+Dim end_border As Integer
+end_border = 100
+If My.X > end_border Then
+	Universe.sum_time_for_static =
+		Universe.sum_time_for_static + GetCountStep() - My.start_step
+	DelAgt(My)
+	return
+End if
 
 Dim border As Integer
 border = 30
@@ -187,6 +213,8 @@ End if
 Dim end_border As Integer
 end_border = 100
 If My.X > end_border Then
+	Universe.sum_time_for_moving =
+		Universe.sum_time_for_moving + GetCountStep() - My.start_step
 	DelAgt(My)
 	return
 End if
@@ -202,7 +230,7 @@ If My.X > border Then
 End if
 
 
-// case 28<X<=30, 間隔2以上なら速度1で前進、2未満なら停止
+// case 28<X<=30, 間隔>=2なら1前進、<2なら停止
 if My.X >border - 2 Then 
 	If My.ID == 0 Then
 		Forward(1)
@@ -214,7 +242,7 @@ if My.X >border - 2 Then
 	Else
 		My.condition = Color_Red
 	End if
-Else // case X < 28, 間隔1以上なら速度2で前進、1未満なら停止
+Else // case X < 28, 間隔>=1なら2前進、<1なら停止
 	If My.ID == 0 Then
 		Forward(My.speed)
 		return
@@ -225,10 +253,10 @@ Else // case X < 28, 間隔1以上なら速度2で前進、1未満なら停止
 		My.condition = Color_Black
 	Elseif My.distance > 1 Then
 		My.X = front.X - 2
-		My.condition = Color_Blue //間隔2を保つ
+		My.condition = Color_Blue
 	Else
 		My.X = front.X - 1
-		My.condition = Color_Mazenta //間隔1を保つ
+		My.condition = Color_Mazenta
 	End if
 End if
 }
@@ -381,7 +409,7 @@ Map_Output {
 // Control Panel Definition Division
 //-------------------------------------------------------
 Control_Panel {
-    Display_Area = 1114, 560, 150, 224;
+    Display_Area = 1281, 62, 159, 224;
     Display_Type = 0;
     Panel_Item {
         Item_Type = Slider;
@@ -472,8 +500,8 @@ Network_Info {
 // Window Location Definition Division
 //-------------------------------------------------------
 Window_Rectangle {
-    Window_Name = Main_Window, 0, 23, 1373, 700;
-    Window_Name = Output_Setting_Window, 461, 175, 480, 350;
+    Window_Name = Main_Window, 0, 23, 1440, 700;
+    Window_Name = Output_Setting_Window, 495, 175, 480, 350;
     Window_Name = Artisoc_Help_Window, 10, 10, 400, 300;
 }
 
