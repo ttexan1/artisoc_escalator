@@ -51,6 +51,7 @@ UNIVERSE {
 //-------------------------------------------------------
 Initial_Value {
     UNIVERSE.APPEAR_RATE = 1(0.30000000000000004);
+    UNIVERSE.ESC_SPEED = 1(5.0);
 }
 
 
@@ -63,8 +64,11 @@ Univ_Init{
 	Universe.sum_time_for_moving = 0
 }
 
-//function func(arg) as Integer {
-//}
+function rnd_speed() as Double {
+	Dim deviation As Double
+	deviation = 0.5
+	return 2 + Rnd() * deviation - deviation/2
+}
 
 Univ_Step_Begin{
 	Dim waiting_limit As integer
@@ -77,20 +81,23 @@ Univ_Step_Begin{
 	Dim moving_person As Agt
 	Dim n_moving_person As Integer
 	
-	if GetCountStep() <= 80 and GetCountStep() Mod 2 == 0 Then
+	if GetCountStep() Mod 200 <= 80 and GetCountStep() Mod 2 == 0 Then
+	/* comment : 80より大きくしてもいいかもしれない。 
+	もしくは、Mod 2 == 0のもと一定間隔で人が登場するのをランダムにしてもよいかも*/
 		If Universe.n_waiting < waiting_limit and hurry_degree > Universe.appear_rate Then
-			Println(Universe.n_waiting)
 			person = CreateAgt(Universe.escalator.person)
-			person.speed = 2
+			person.speed = rnd_speed()
 			person.is_last= true
 			person.start_step = GetCountStep()
 		Else
 			moving_person = CreateAgt(Universe.escalator.moving_person)
-			moving_person.speed = 2
+			moving_person.speed = rnd_speed()
 			moving_person.is_last = true
 			moving_person.start_step = GetCountStep()
 		End if
 	End if 
+	/* comment : hurry_degreeの分け方を①絶対wait②絶対move③状況を見て判断としたい
+	ただし、IDで判別しているので、途中で列を変えるとかはできないかも？*/
 //	Universe.escalator.person(n_person-1).is_last = false
 //	Universe.escalator.moving_person(n_moving_person-1).is_last = false
 
@@ -105,6 +112,8 @@ Univ_Step_Begin{
 		End if
 		Universe.escalator.person(j+1).distance = Universe.escalator.person(j).X - Universe.escalator.person(j+1).X
 	Next j
+	/* comment : 列に並んでいる人をカウントしているというよりは待ち列に行こうとしている人をカウントしている
+	待ち列に行こうとしている人が7人いれば他の人は諦めてしまうので、結局待ち列は渋滞を起こさない*/
 	
 	n_moving_person = CountAgt(Universe.escalator.moving_person)
 	For j = 0 To n_moving_person-2
@@ -113,7 +122,7 @@ Univ_Step_Begin{
 }
 
 Univ_Step_End{
-	If GetCountStep() >= 200 Then
+	If GetCountStep() >= 4000 Then
 		ExitSimulationMsgLn("static:" & Universe.sum_time_for_static & "moving:" & Universe.sum_time_for_moving)
 	End if
 }
@@ -155,9 +164,13 @@ End if
 
 Dim border As Integer
 border = 30
+	/* comment : X = 30に補助線を引きたい*/
 
 If My.X > border Then //X>30で、距離を2に保ちながら1ずつ移動する
 	Forward(1)
+	/* comment : Forward(Universe.esc_speed)*/
+	/* comment : エスカレーター待ちの渋滞を発生させるために、
+	esc_speedは少なくともperson.speed以下であると良いかも。0.1-1.0とか*/
 	My.condition = Color_Black
 Elseif My.X > border - 2 Then // 28<X<=30で、間隔2以上なら速度1で前進、2未満なら停止
 	If My.ID == 0 Then
@@ -175,7 +188,7 @@ Else //X<28で、間隔1以上なら速度2で前進、1未満なら停止
 	If My.ID == 0 Then
 		Forward(My.speed)
 	Else
-		If My.distance >= My.speed + 1 Then //速度をランダムにしたときに対応してあります
+		If My.distance >= My.speed + 1 Then
 			Forward(My.speed)
 			My.condition = Color_Black
 		Elseif My.distance > 1 Then
@@ -248,7 +261,7 @@ Else // case X < 28, 間隔>=1なら2前進、<1なら停止
 		return
 	End if
 	
-	If My.distance >= My.speed + 1 Then //速度をランダムにしたときに対応してあります
+	If My.distance >= My.speed + 1 Then
 		Forward(My.speed)
 		My.condition = Color_Black
 	Elseif My.distance > 1 Then
@@ -272,7 +285,7 @@ Single_Simulation {
     Step_Max = 0;
     Time_Max = 0;
     End_Condition = "";
-    Exec_Wait = 100;
+    Exec_Wait = 523;
     Exec_Wait_Max = 1000;
     Random_Generator = Java_Standard;
     Exec_Order = Random;
@@ -409,7 +422,7 @@ Map_Output {
 // Control Panel Definition Division
 //-------------------------------------------------------
 Control_Panel {
-    Display_Area = 1281, 62, 159, 224;
+    Display_Area = 1252, 32, 159, 224;
     Display_Type = 0;
     Panel_Item {
         Item_Type = Slider;
@@ -441,7 +454,7 @@ Control_Panel {
         Slider_Range_Max = 9;
         Slider_Value_Min = 1.0;
         Slider_Value_Step = 1.0;
-        Slider_Value = "0";
+        Slider_Value = "4";
     }
 }
 
@@ -466,7 +479,7 @@ Others_Data {
     Debug_Size_x = 400;
     Debug_Size_y = 200;
     Console_Position_x = 2;
-    Console_Position_y = 400;
+    Console_Position_y = 399;
     Console_Size_x = 600;
     Console_Size_y = 120;
     Componen_Tree_Position_x = 3;
@@ -500,8 +513,8 @@ Network_Info {
 // Window Location Definition Division
 //-------------------------------------------------------
 Window_Rectangle {
-    Window_Name = Main_Window, 0, 23, 1440, 700;
-    Window_Name = Output_Setting_Window, 495, 175, 480, 350;
+    Window_Name = Main_Window, 0, 23, 1440, 815;
+    Window_Name = Output_Setting_Window, 495, 232, 480, 350;
     Window_Name = Artisoc_Help_Window, 10, 10, 400, 300;
 }
 
@@ -519,6 +532,8 @@ Help_Favorite {
 Model_Description {
     Universe {
         Function Univ_Init {
+        }
+        Function rnd_speed {
         }
         Function Univ_Step_Begin {
         }
